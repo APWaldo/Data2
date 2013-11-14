@@ -1,0 +1,244 @@
+# White House - Data II Assignment #1
+
+# Caelainn Barr, Annie Waldman, Daniel Drepper | We did the project together
+
+# To start we load in the 2012 and 2013 visitor data
+visits12 <- read.csv("WhiteHouse-WAVES-2012.csv") 
+visits13 <- read.csv("whitehouse-waves-2013_6.csv")
+
+# Because we want to compare the names in our visitor data we try to change their format
+# to an easy comparable version. To begin we paste the first and last names in 2012 and 2013
+# together in one column and name these nms12 and nms13. 
+nms12 = paste(visits12$NAMEFIRST,visits12$NAMELAST)
+nms13 = paste(visits13$NAMEFIRST,visits13$NAMELAST)
+
+# Now we convert names in 2012 and 2013 data to UTF-8 format and to all lowercase
+# We do this to compare them later on to other databases. With all lowercase we
+# can be sure that we really get all the names
+nms12 = tolower(iconv(nms12,to="UTF-8"))
+nms13 = tolower(iconv(nms13,to="UTF-8"))
+
+# With sum we can see all errors in our 2012 and 2013 data
+sum(is.na(nms12))
+sum(is.na(nms13))
+
+# Now we look at the rows that have errors
+visits12[is.na(nms12),]
+visits13[is.na(nms13),]
+
+# And replace all na in our datasets with "" ; the na's are now omitted
+nms12[is.na(nms12)]=""
+nms13[is.na(nms13)]=""
+
+# take a look at nms12 and nms13 to see what we did up to here
+View(nms12)
+View(nms13)
+
+# Now we bind our newly prepared lowercased names in nms12 and nms13 via cbind
+# to the rows of visits12 and visits13. Via cbind we add them as an extra column
+# to the far right of our dataset
+visitsnms12 <- cbind(visits12,nms12)
+visitsnms13 <- cbind(visits13,nms13)
+View(visitsnms12)
+View(visitsnms13)
+
+# Now we rename the last column in our datasets visitsnms12 and visitsnms13
+# (called nms12 respecitively nms13) both to nms because after that we may want 
+# to combine our two datasets into one and we need the same column names for that
+names(visitsnms12)[names(visitsnms12) == 'nms12'] <- 'lowername'
+names(visitsnms13)[names(visitsnms13) == 'nms13'] <- 'lowername'
+View(visitsnms12)
+View(visitsnms13)
+
+#visitsnms12=visits12
+#visitsnms12$lowername = nms12
+
+# Now we can put both visitorsets (with our added lowercase name columen) into
+# one White House visit file for 12 AND 13
+visits1213 <- rbind(visitsnms12,visitsnms13)
+View(visits1213)
+
+# Now we download a file with all lobbyists registered for lobbying on the federal level
+# If you haven't already done that for your project you can find the data 
+# at the sunlight foundation: 
+# http://sunlightlabs.github.io/datacommons/bulk_data.html#available-datasets/federal-lobbyingread 
+# After downloading in putting in your workspace you can read the file in 
+lobbyist <- read.csv("lobbyist.csv")
+
+# Because we're only interested in 2012 and 2013 we create a limited dataset for these years
+lobbyist1213 <- subset (lobbyist, lobbyist$year == "2012" | lobbyist$year == "2013")
+View(lobbyist1213)
+
+# The lobbyistnames are not in the right order in the database of the sunlight foundation.
+# They are lastname, firstname instead of firstname lastname.
+# To solve that problem we first separate the names column in the lobbyists2013 data
+# and call the new variable x. We then divide the names column into two columns. How?
+
+# We create a dataset "lobbylast" that only keeps the first of two parts of the dataset x.
+# We structure the dataset through "(.*), (.*)". That means that we take everything up to 
+# the first comma as our first part and everything after the comma and the space 
+# as our second part. We then define that we want to keep the first part.
+# And lastly we add the dataset (x).
+x = lobbyist1213$lobbyist_name
+lobbylast = gsub("(.*), (.*)", "\\1", x)
+View(lobbylast)
+
+# We do the same procedure for our first names
+lobbyfirst = gsub("(.*), (.*)", "\\2", x)
+View(lobbyfirst)
+
+# You see in lobbyfirst that we have a couple of middle initials etc.
+# To make it easier we extract these middle initials and keep only the first part
+# up to the first space in each row
+lobbyfirstfirst = gsub("([^ ]+) .*","\\1",lobbyfirst)
+
+# We now paste the first name (without the middle initial) and the last name together again
+# Now we have the lobbynames in the right order firstname lastname (like the visitorlogs)
+lobbyfullname = paste(lobbyfirstfirst, lobbylast)
+View(lobbyfullname)
+
+# We lower all cases in lobbyfullname and change it to UTF-8 to make it readable
+#lobbylower= tolower(lobbyfullname)
+lobbylower = tolower(iconv(lobbyfullname,to="UTF-8"))
+
+# finally we look up which names from the lobbyregister come up in the visitorlogs of 2012
+lobbyvisitor12  <- lobbylower %in% nms12
+View(lobbyvisitor12)
+
+# We want to know how many lobbyists have been visiting the white house at least once in 2012
+sum(nms12%in%lobbylower)
+
+# how many names from the visitorlogs are coming up in the lobbyist database
+nms12[nms12 %in% lobbylower]
+nms13[nms13 %in% lobbylower]
+
+# how many lobbyists are coming up in the visitorlogs
+lobbylower[lobbylower %in% nms12]
+
+# Because lobbyists have to file a couple of times if they are lobbying for different
+# companies or for different topcis the lobbylower data contains the same names
+# several times. Now we remove all duplicates of lobbyist-names in the lobbylower data
+# because at the moment we only want to know hof often specific lobbyists have been to 
+# the white house 
+lobbyistunique= unique(lobbylower)
+#lobbyistunique  <- unique(lobbylower[duplicated(lobbylower)])
+
+# here we can look up how many lobbyists have been at least one time to the white house
+sum(lobbyistunique%in%nms12)
+sum(lobbyistunique%in%nms13)
+
+# Which visitors are the most named in the lobbyist database?
+# To see that we make a table and sort it. For 2012 and for 2013.
+sort(table(nms12[nms12 %in% lobbyistunique]))
+
+# In 2012 Yvette Fontenot came in 155 times, after that Richard Miller (131)
+# Daniel Jones (129), Michael Smith (109) and Robert Ryan (106)
+
+sort(table(nms13[nms13 %in% lobbyistunique]))
+# In 2013 it was Daniel Jones (59), Michael Berman (47), Mary Phillips (47)
+# Michael Smith (44), John Kelly (43)
+
+# put together visitee firstname and visitee lastname
+visiteefullname = paste(visits1213$visitee_namefirst, visits1213$visitee_namelast)
+View(visiteefullname)
+visiteelower = tolower(iconv(visiteefullname,to="UTF-8"))
+View(visiteelower)
+visits1213 <- cbind(visits1213, visiteelower)
+
+# We would like to see who is going into the white house together with Yvette Fontenot. 
+# For that we use the column "UIN" in the white house visitor logs. With UIN the 
+# white house describes every visitor group. So if somebody is visiting with the same
+# UIN Yvette Fontenot is visiting with, they came together / to the same event.
+# We use the visits from 2012 and 2013h and keep the first six columns to get some 
+# background on the people and the visits
+groupyvette = visits1213[visits1213$UIN %in% visits1213$UIN[visits1213$lowername=="yvette fontenot"], c(29,1,2,4,15,22,23,27,31)]
+View(groupyvette)
+
+# How many lobbyists are there that went to the white house together with yvette fontenot
+# at least one time in the years 2012 and 2013
+dim(groupyvette)
+
+# sort the list of lobbyists by UIN to see who went with whom
+groupyvetteUIN <- groupyvette[sort.list(groupyvette$UIN),]
+View(groupyvetteUIN)
+
+# sort to see who was visited the most
+sort(table(groupyvetteUIN$visiteelower))
+
+# who are the people who got visited by lobbyists in the white house (power brokers)  - subset
+yvettesub  <- subset(visits1213,visits1213$lowername=="yvette fontenot")
+View(yvettesub)
+
+lobby1213 = visits1213[visits1213$lowername %in% lobbyistunique, c(29,1,2,4,12,15,22,23,27,31)]
+View(lobby1213)
+dim(lobby1213)
+
+sort(table(lobby1213$visiteelower))
+
+# we create a dataset without all group tours
+lobby1213notours  <- subset(lobby1213,lobby1213$Description!="GROUP TOUR")
+View(lobby1213notours)
+dim(lobby1213notours)
+
+# thanks to jeroen we have another subset without any description that start with GROUP TOUR
+grouptour <- grepl("^GROUP TOUR", lobby1213notours$Description)
+data1 <- lobby1213notours[grouptour, ]
+data2 <- lobby1213notours[!grouptour, ]
+
+lobby1213clean <- data2
+View(lobby1213clean)
+
+sort(table(lobby1213clean$visiteelower))
+
+# delete all rows without visitees
+lobby1213reallyclean  <- subset(lobby1213clean,lobby1213clean$visiteelower!=" ")
+View(lobby1213reallyclean)
+sort(table(lobby1213reallyclean$visiteelower))
+
+# who is visiting the most (reallycleanvisits)
+tail(sort(table(lobby1213reallyclean$lowername)),100)
+
+# because yvette fontenot was in 12 and 13 191 times and we get her now only 175 times we want
+# to check if she is 16 times in GROUP TOUR or without a visitee to explain the decreased number
+yvettesub <- subset(visits1213,visits1213$lowername=="yvette fontenot")
+View(yvettesub)
+
+tail(sort(table(yvettesub$visiteelower)))
+
+tail(sort(table(lobby1213reallyclean$visiteelower)),50)
+
+plot(lobby1213reallyclean$visiteelower)
+barplot(tail(sort(table(lobby1213reallyclean$visiteelower)),50))
+
+who = c("yvette fontenot","daniel jones","richard miller","john thomas","john thompson")
+
+who
+i = 1
+who[1]
+firstperson = who[i]
+j = 2
+secondperson = who[j]
+
+firstevents = lobby1213reallyclean$UIN[lobby1213reallyclean$lowername == firstperson]
+secondevents = lobby1213reallyclean$UIN[lobby1213reallyclean$lowername == secondperson]
+
+sum(firstevents %in% secondevents)
+
+# are there lobbyists going together into the white house / which are the biggest events
+tail(sort(table(lobby1213reallyclean$UIN)),20)
+
+# who is going to the biggest events and what is happening
+U83535 <- subset(lobby1213reallyclean, lobby1213reallyclean$UIN=="U83535")
+View(U83535)
+
+U55399 <- subset(lobby1213reallyclean, lobby1213reallyclean$UIN=="U55399")
+View(U55399)
+
+INAUG1 <- subset(lobby1213reallyclean, lobby1213reallyclean$UIN=="INAUG1")
+View(INAUG1)
+
+U20020 <- subset(lobby1213reallyclean, lobby1213reallyclean$UIN=="U20020")
+View(U20020)
+
+U93466 <- subset(lobby1213reallyclean, lobby1213reallyclean$UIN=="U93466")
+View(U93466)
